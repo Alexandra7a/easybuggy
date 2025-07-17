@@ -1,8 +1,23 @@
-FROM maven:3.8-jdk-8 as builder
-COPY . /usr/src/easybuggy/
-WORKDIR /usr/src/easybuggy/
-RUN mvn -B package
+# Use a base image with Java 17 pre-installed
+FROM eclipse-temurin:17-jre-jammy
 
-FROM openjdk:8-slim
-COPY --from=builder /usr/src/easybuggy/target/easybuggy.jar /
-CMD ["java", "-XX:MaxMetaspaceSize=128m", "-Xloggc:logs/gc_%p_%t.log", "-Xmx256m", "-XX:MaxDirectMemorySize=90m", "-XX:+UseSerialGC", "-XX:+PrintHeapAtGC", "-XX:+PrintGCDetails", "-XX:+PrintGCDateStamps", "-XX:+UseGCLogFileRotation", "-XX:NumberOfGCLogFiles=5", "-XX:GCLogFileSize=10M", "-XX:GCTimeLimit=15", "-XX:GCHeapFreeLimit=50", "-XX:+HeapDumpOnOutOfMemoryError", "-XX:HeapDumpPath=logs/", "-XX:ErrorFile=logs/hs_err_pid%p.log", "-agentlib:jdwp=transport=dt_socket,server=y,address=9009,suspend=n", "-Dderby.stream.error.file=logs/derby.log", "-Dderby.infolog.append=true", "-Dderby.language.logStatementText=true", "-Dderby.locks.deadlockTrace=true", "-Dderby.locks.monitor=true", "-Dderby.storage.rowLocking=true", "-Dcom.sun.management.jmxremote", "-Dcom.sun.management.jmxremote.port=7900", "-Dcom.sun.management.jmxremote.ssl=false", "-Dcom.sun.management.jmxremote.authenticate=false", "-ea", "-jar", "easybuggy.jar"]
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy the pom.xml file to download dependencies in a separate layer
+COPY pom.xml .
+
+# Download Maven dependencies, caching them for faster builds
+RUN mvn dependency:go-offline
+
+# Copy the source code into the container
+COPY src ./src
+
+# Build the application using Maven
+RUN mvn clean compile package -DskipTests
+
+# Expose port 8080 for the web application
+EXPOSE 8080
+
+# Define the command to run the application when the container starts
+CMD ["java", "-jar", "target/*.war"]
