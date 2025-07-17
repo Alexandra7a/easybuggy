@@ -1,23 +1,27 @@
-# Use a base image with Java 17 pre-installed
-FROM eclipse-temurin:17-jre-jammy
+# Use a base image with Java 17 (or the required version) and a minimal footprint
+FROM eclipse-temurin:17-jre-alpine
 
 # Set the working directory inside the container
 WORKDIR /app
 
-# Copy the pom.xml file to download dependencies in a separate layer
+# Copy only the pom.xml file first to leverage Docker caching
 COPY pom.xml .
 
-# Download Maven dependencies, caching them for faster builds
-RUN mvn dependency:go-offline
+# Download dependencies without building the application
+RUN mvn dependency:go-offline -B
 
 # Copy the source code into the container
 COPY src ./src
 
 # Build the application using Maven
-RUN mvn clean compile package -DskipTests
+RUN mvn clean install -DskipTests # Skip tests during image build for faster builds, run them in CI/CD
 
-# Expose port 8080 for the web application
+# Expose the port your application runs on (usually 8080)
 EXPOSE 8080
 
-# Define the command to run the application when the container starts
-CMD ["java", "-jar", "target/*.war"]
+# Define the command to run the application when the container starts.  Adjust if necessary based on your JAR name.
+CMD ["java", "-jar", "target/*.jar"]
+
+# Optional: Create a non-root user for security (adjust as needed)
+# RUN addgroup -S easybuggy && adduser -S easybuggy -G easybuggy
+# USER easybuggy
